@@ -1,0 +1,950 @@
+<!DOCTYPE html>
+
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>壁紙月曆產生器</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Serif+TC:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+/* ─── Reset & Base ─── */
+* { margin:0; padding:0; box-sizing:border-box; }
+
+:root {
+–bg:       #1a1714;
+–surface:  #242018;
+–border:   rgba(200,180,140,0.12);
+–gold:     #c8a84a;
+–gold-dim: rgba(200,168,74,0.35);
+–text:     #e8e0d0;
+–text-dim: rgba(232,224,208,0.5);
+–text-faint: rgba(232,224,208,0.28);
+–accent:   #a07838;
+–red:      #c04030;
+}
+
+html, body {
+background: var(–bg);
+color: var(–text);
+font-family: ‘Noto Serif TC’, serif;
+min-height: 100vh;
+overflow-x: hidden;
+}
+
+/* ─── Layout ─── */
+.app {
+display: grid;
+grid-template-columns: 340px 1fr;
+min-height: 100vh;
+}
+
+/* ─── Sidebar ─── */
+.sidebar {
+background: var(–surface);
+border-right: 1px solid var(–border);
+padding: 28px 20px;
+overflow-y: auto;
+display: flex;
+flex-direction: column;
+gap: 20px;
+}
+
+.logo {
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 15px;
+font-style: italic;
+letter-spacing: 4px;
+color: var(–gold);
+padding-bottom: 18px;
+border-bottom: 1px solid var(–border);
+}
+.logo span { font-style: normal; font-size: 10px; color: var(–text-dim); display: block; margin-top: 3px; letter-spacing: 2px; }
+
+/* Section header */
+.sec-title {
+font-size: 9px;
+letter-spacing: 3px;
+color: var(–gold);
+text-transform: uppercase;
+margin-bottom: 10px;
+display: flex;
+align-items: center;
+gap: 8px;
+}
+.sec-title::after { content:’’; flex:1; height:0.5px; background:var(–border); }
+
+/* Upload zone */
+.upload-zone {
+border: 1px dashed rgba(200,168,74,0.3);
+border-radius: 10px;
+padding: 20px;
+text-align: center;
+cursor: pointer;
+transition: all .2s;
+position: relative;
+overflow: hidden;
+}
+.upload-zone:hover { border-color: var(–gold); background: rgba(200,168,74,0.04); }
+.upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; }
+.upload-icon { font-size: 24px; margin-bottom: 8px; }
+.upload-text { font-size: 11px; color: var(–text-dim); letter-spacing: 1px; line-height: 1.6; }
+.upload-hint { font-size: 9px; color: var(–text-faint); margin-top: 4px; }
+
+/* Month picker */
+.month-row {
+display: flex;
+gap: 8px;
+align-items: center;
+}
+.month-row select, .month-row input {
+flex: 1;
+background: rgba(255,255,255,0.04);
+border: 1px solid var(–border);
+border-radius: 6px;
+color: var(–text);
+padding: 8px 10px;
+font-family: ‘Noto Serif TC’, serif;
+font-size: 12px;
+outline: none;
+transition: border-color .2s;
+}
+.month-row select:focus, .month-row input:focus { border-color: var(–gold-dim); }
+.month-row select option { background: #2a2418; }
+
+/* Toggle switches */
+.toggle-group { display: flex; flex-direction: column; gap: 8px; }
+
+.toggle-row {
+display: flex;
+align-items: center;
+justify-content: space-between;
+padding: 8px 10px;
+border-radius: 7px;
+border: 1px solid var(–border);
+cursor: pointer;
+transition: background .15s;
+}
+.toggle-row:hover { background: rgba(255,255,255,0.03); }
+.toggle-label { font-size: 11px; color: var(–text-dim); letter-spacing: 0.5px; }
+.toggle-label small { display:block; font-size:9px; color:var(–text-faint); margin-top:1px; }
+
+.switch {
+width: 32px; height: 17px;
+border-radius: 10px;
+background: rgba(255,255,255,0.08);
+position: relative;
+transition: background .2s;
+flex-shrink: 0;
+}
+.switch.on { background: var(–accent); }
+.switch::after {
+content:’’;
+position:absolute;
+width:13px; height:13px;
+border-radius:50%;
+background: #fff;
+top:2px; left:2px;
+transition: transform .2s;
+}
+.switch.on::after { transform: translateX(15px); }
+
+/* Sliders */
+.slider-group { display:flex; flex-direction:column; gap:12px; }
+
+.slider-item label {
+display: flex;
+justify-content: space-between;
+font-size: 10px;
+color: var(–text-dim);
+margin-bottom: 5px;
+letter-spacing: 0.5px;
+}
+.slider-item label span { color: var(–gold); font-family: ‘Cormorant Garamond’, serif; font-size:12px; }
+
+input[type=range] {
+width: 100%;
+-webkit-appearance: none;
+height: 2px;
+background: rgba(255,255,255,0.1);
+border-radius: 2px;
+outline: none;
+}
+input[type=range]::-webkit-slider-thumb {
+-webkit-appearance: none;
+width: 14px; height: 14px;
+border-radius: 50%;
+background: var(–gold);
+cursor: pointer;
+}
+
+/* Color pickers */
+.color-row { display:flex; gap:8px; flex-wrap:wrap; }
+
+.color-item {
+display: flex;
+flex-direction: column;
+align-items: center;
+gap: 4px;
+font-size: 8px;
+color: var(–text-faint);
+letter-spacing: 0.5px;
+}
+.color-item input[type=color] {
+width: 32px; height: 32px;
+border-radius: 6px;
+border: 1px solid var(–border);
+background: none;
+cursor: pointer;
+padding: 2px;
+}
+
+/* Font selector */
+.font-grid {
+display: grid;
+grid-template-columns: 1fr 1fr;
+gap: 6px;
+}
+.font-btn {
+padding: 8px;
+border: 1px solid var(–border);
+border-radius: 6px;
+background: transparent;
+color: var(–text-dim);
+font-size: 11px;
+cursor: pointer;
+text-align: center;
+transition: all .15s;
+letter-spacing: 0.5px;
+}
+.font-btn:hover, .font-btn.active { border-color: var(–gold); color: var(–gold); background: rgba(200,168,74,0.06); }
+
+/* Position slider */
+.position-row { display:flex; gap:8px; }
+.position-row .slider-item { flex:1; }
+
+/* Export button */
+.export-btn {
+background: linear-gradient(135deg, #a07838, #c8a84a);
+color: #1a1410;
+border: none;
+border-radius: 8px;
+padding: 12px;
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 14px;
+font-weight: 400;
+letter-spacing: 3px;
+cursor: pointer;
+width: 100%;
+transition: opacity .2s;
+margin-top: auto;
+}
+.export-btn:hover { opacity: 0.85; }
+
+/* ─── Preview area ─── */
+.preview-area {
+display: flex;
+flex-direction: column;
+align-items: center;
+justify-content: center;
+padding: 40px;
+gap: 16px;
+position: relative;
+}
+
+.preview-label {
+font-size: 9px;
+letter-spacing: 3px;
+color: var(–text-faint);
+text-transform: uppercase;
+}
+
+/* Phone preview frame */
+.phone-wrap {
+position: relative;
+filter: drop-shadow(0 30px 60px rgba(0,0,0,0.7));
+}
+
+.phone-frame {
+width: 320px;
+height: 693px; /* 9:19.5 approx */
+border-radius: 40px;
+overflow: hidden;
+position: relative;
+border: 1.5px solid rgba(200,180,140,0.2);
+}
+
+/* Background image */
+#bgLayer {
+position: absolute;
+inset: 0;
+background-size: cover;
+background-position: center top;
+background-color: #e8e2d8;
+}
+
+/* Calendar overlay on preview */
+#calLayer {
+position: absolute;
+left: 0; right: 0;
+padding: 0 18px;
+z-index: 5;
+}
+
+/* ─── Calendar Typography ─── */
+.cal-header { margin-bottom: 4px; }
+
+.cal-title-row {
+display: flex;
+align-items: flex-end;
+justify-content: space-between;
+line-height: 1;
+}
+
+#calMonthEn {
+font-family: ‘Cormorant’, serif;
+font-weight: 300;
+letter-spacing: -1px;
+line-height: 0.88;
+}
+
+.cal-right { text-align: right; padding-bottom: 4px; }
+#calYear {
+font-family: ‘Cormorant Garamond’, serif;
+font-weight: 300;
+font-style: italic;
+letter-spacing: 3px;
+display: block;
+line-height: 1.5;
+}
+#calMonthZh {
+font-family: ‘Noto Serif TC’, serif;
+font-weight: 200;
+letter-spacing: 6px;
+display: block;
+}
+
+.cal-rule {
+display: flex; align-items: center; gap: 6px;
+margin: 5px 0 3px;
+}
+.cal-rule-line { flex:1; height:0.5px; }
+.cal-rule-mark { width:4px; height:4px; border:0.5px solid; transform:rotate(45deg); opacity:0.5; }
+
+#calSub {
+font-family: ‘Noto Serif TC’, serif;
+font-size: 7px;
+font-weight: 200;
+letter-spacing: 2.5px;
+text-align: center;
+}
+
+.cal-wk-row {
+display: grid;
+grid-template-columns: repeat(7,1fr);
+margin: 7px 0 3px;
+padding-bottom: 3px;
+}
+.cal-wk {
+text-align: center;
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 8px;
+letter-spacing: 1px;
+}
+
+.cal-grid {
+display: grid;
+grid-template-columns: repeat(7,1fr);
+}
+.cal-cell {
+display: flex; flex-direction: column;
+align-items: center; justify-content: center;
+padding: 2px 0; position: relative;
+min-height: 34px;
+}
+.cal-cell.empty { opacity:0; }
+.cal-g {
+font-family: ‘Cormorant’, serif;
+font-size: 16px; font-weight: 300; line-height: 1;
+}
+.cal-l {
+font-family: ‘Noto Serif TC’, serif;
+font-size: 5.5px; font-weight: 200;
+margin-top: 1px; line-height: 1.3;
+text-align: center; letter-spacing: 0.2px;
+}
+.cal-paw {
+position:absolute; top:1px; right:1px;
+font-size:9px; opacity:0.3; line-height:1;
+}
+
+.cal-legend {
+display: flex; gap: 12px; justify-content: center;
+padding-top: 4px; margin-top: 4px;
+}
+.cal-leg-item {
+display: flex; align-items: center; gap: 3px;
+font-family: ‘Cormorant Garamond’, serif;
+font-size: 6.5px; font-style: italic; letter-spacing: 0.8px;
+}
+.cal-leg-dot { width:3.5px; height:3.5px; border-radius:50%; }
+</style>
+
+</head>
+<body>
+
+<div class="app">
+
+  <!-- ══ SIDEBAR ══ -->
+
+  <div class="sidebar">
+    <div class="logo">
+      Calendar Wallpaper
+      <span>壁紙月曆產生器</span>
+    </div>
+
+```
+<!-- Upload -->
+<div>
+  <div class="sec-title">背景圖片</div>
+  <div class="upload-zone" id="uploadZone">
+    <input type="file" id="bgInput" accept="image/*">
+    <div class="upload-icon">🖼</div>
+    <div class="upload-text">點擊或拖曳上傳插畫</div>
+    <div class="upload-hint">支援 JPG · PNG · WEBP</div>
+  </div>
+</div>
+
+<!-- Month / Year -->
+<div>
+  <div class="sec-title">月份設定</div>
+  <div class="month-row">
+    <select id="selYear"></select>
+    <select id="selMonth">
+      <option value="0">1月 January</option>
+      <option value="1">2月 February</option>
+      <option value="2">3月 March</option>
+      <option value="3">4月 April</option>
+      <option value="4" selected>5月 May</option>
+      <option value="5">6月 June</option>
+      <option value="6">7月 July</option>
+      <option value="7">8月 August</option>
+      <option value="8">9月 September</option>
+      <option value="9">10月 October</option>
+      <option value="10">11月 November</option>
+      <option value="11">12月 December</option>
+    </select>
+  </div>
+</div>
+
+<!-- Display toggles -->
+<div>
+  <div class="sec-title">顯示設定</div>
+  <div class="toggle-group">
+    <div class="toggle-row" onclick="toggle('showLunar')">
+      <div class="toggle-label">農曆日期<small>農曆初一、十五等</small></div>
+      <div class="switch on" id="sw-showLunar"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('showHoliday')">
+      <div class="toggle-label">國定假日<small>勞動節、元旦等</small></div>
+      <div class="switch on" id="sw-showHoliday"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('showFestival')">
+      <div class="toggle-label">傳統節日<small>母親節、媽祖生等</small></div>
+      <div class="switch on" id="sw-showFestival"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('showJieqi')">
+      <div class="toggle-label">二十四節氣<small>立夏、小滿等</small></div>
+      <div class="switch on" id="sw-showJieqi"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('showPaw')">
+      <div class="toggle-label">週末貓掌印 🐾<small>週六欄位裝飾</small></div>
+      <div class="switch on" id="sw-showPaw"></div>
+    </div>
+    <div class="toggle-row" onclick="toggle('showLegend')">
+      <div class="toggle-label">圖例說明<small>底部標示說明</small></div>
+      <div class="switch on" id="sw-showLegend"></div>
+    </div>
+  </div>
+</div>
+
+<!-- Typography -->
+<div>
+  <div class="sec-title">字型</div>
+  <div class="font-grid">
+    <button class="font-btn active" onclick="setFont('Cormorant')" data-font="Cormorant">Cormorant<br><small style="font-size:8px;opacity:0.6">典雅襯線</small></button>
+    <button class="font-btn" onclick="setFont('Garamond')" data-font="Garamond">Garamond<br><small style="font-size:8px;opacity:0.6">古典書籍</small></button>
+    <button class="font-btn" onclick="setFont('Georgia')" data-font="Georgia">Georgia<br><small style="font-size:8px;opacity:0.6">清晰易讀</small></button>
+    <button class="font-btn" onclick="setFont('Noto')" data-font="Noto">Noto Serif<br><small style="font-size:8px;opacity:0.6">中文優先</small></button>
+  </div>
+</div>
+
+<!-- Size & Spacing -->
+<div>
+  <div class="sec-title">大小 · 間距</div>
+  <div class="slider-group">
+    <div class="slider-item">
+      <label>月份標題大小 <span id="vTitleSize">68</span>px</label>
+      <input type="range" min="40" max="100" value="68" id="titleSize" oninput="updateSlider('titleSize','vTitleSize');renderCal()">
+    </div>
+    <div class="slider-item">
+      <label>日期數字大小 <span id="vDateSize">16</span>px</label>
+      <input type="range" min="10" max="28" value="16" id="dateSize" oninput="updateSlider('dateSize','vDateSize');renderCal()">
+    </div>
+    <div class="slider-item">
+      <label>農曆字大小 <span id="vLunarSize">5.5</span>px</label>
+      <input type="range" min="4" max="10" value="5.5" step="0.5" id="lunarSize" oninput="updateSlider('lunarSize','vLunarSize');renderCal()">
+    </div>
+    <div class="slider-item">
+      <label>行高間距 <span id="vRowH">34</span>px</label>
+      <input type="range" min="26" max="52" value="34" id="rowH" oninput="updateSlider('rowH','vRowH');renderCal()">
+    </div>
+  </div>
+</div>
+
+<!-- Position -->
+<div>
+  <div class="sec-title">月曆位置</div>
+  <div class="slider-group">
+    <div class="slider-item">
+      <label>距頂部 <span id="vCalTop">36</span>px</label>
+      <input type="range" min="10" max="300" value="36" id="calTop" oninput="updateSlider('calTop','vCalTop');renderCal()">
+    </div>
+    <div class="slider-item">
+      <label>左右邊距 <span id="vCalPad">18</span>px</label>
+      <input type="range" min="8" max="40" value="18" id="calPad" oninput="updateSlider('calPad','vCalPad');renderCal()">
+    </div>
+  </div>
+</div>
+
+<!-- Colors -->
+<div>
+  <div class="sec-title">顏色</div>
+  <div class="color-row">
+    <div class="color-item">
+      <input type="color" id="cText" value="#1e1a17" oninput="renderCal()">
+      <span>一般文字</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cHoli" value="#a82820" oninput="renderCal()">
+      <span>假日</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cJieqi" value="#907028" oninput="renderCal()">
+      <span>節氣</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cSpecial" value="#685878" oninput="renderCal()">
+      <span>特別日</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cSun" value="#b03020" oninput="renderCal()">
+      <span>星期日</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cSat" value="#507050" oninput="renderCal()">
+      <span>星期六</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cGold" value="#907028" oninput="renderCal()">
+      <span>裝飾線</span>
+    </div>
+    <div class="color-item">
+      <input type="color" id="cZh" value="#685878" oninput="renderCal()">
+      <span>中文月份</span>
+    </div>
+  </div>
+</div>
+
+<!-- Export -->
+<button class="export-btn" onclick="exportImg()">
+  ↓ &nbsp; 匯出桌布
+</button>
+```
+
+  </div>
+
+  <!-- ══ PREVIEW ══ -->
+
+  <div class="preview-area">
+    <div class="preview-label">預覽 · Preview</div>
+    <div class="phone-wrap">
+      <div class="phone-frame" id="phoneFrame">
+        <div id="bgLayer"></div>
+        <div id="calLayer"></div>
+      </div>
+    </div>
+    <div class="preview-label" id="previewNote">截圖或使用「匯出桌布」按鈕儲存</div>
+  </div>
+
+</div>
+
+<script>
+// ─── State ───
+const state = {
+  year: 2026, month: 4, // 0-indexed
+  showLunar: true, showHoliday: true, showFestival: true,
+  showJieqi: true, showPaw: true, showLegend: true,
+  font: 'Cormorant',
+};
+
+// ─── Lunar data for 2025–2027 (simplified, key months) ───
+// Format: [year][month(1-12)] = [offset, ...days array]
+// offset = lunar day of the 1st gregorian day of that month
+// We store the lunar day name for each gregorian date
+
+const LUNAR_MONTHS = ['正月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+const LUNAR_DAYS = ['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十',
+  '十一','十二','十三','十四','十五','十六','十七','十八','十九','二十',
+  '廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
+
+// Lunar new moon dates (first day of lunar month) for key months
+// Each entry: { gYear, gMonth(1-12), gDay } = 農曆初一
+const LUNAR_NEW_MOONS = [
+  {y:2025,m:1,d:29, lm:'正月'}, {y:2025,m:3,d:29, lm:'二月'},
+  {y:2025,m:4,d:27, lm:'三月'}, {y:2025,m:5,d:27, lm:'四月'},
+  {y:2025,m:6,d:25, lm:'五月'}, {y:2025,m:7,d:25, lm:'六月'},
+  {y:2025,m:8,d:23, lm:'七月'}, {y:2025,m:9,d:22, lm:'八月'},
+  {y:2025,m:10,d:21, lm:'九月'},{y:2025,m:11,d:20, lm:'十月'},
+  {y:2025,m:12,d:20, lm:'十一月'},
+  {y:2026,m:1,d:18, lm:'十二月'},{y:2026,m:2,d:17, lm:'正月'},
+  {y:2026,m:3,d:19, lm:'二月'}, {y:2026,m:4,d:17, lm:'三月'},
+  {y:2026,m:5,d:17, lm:'四月'}, {y:2026,m:6,d:15, lm:'五月'},
+  {y:2026,m:7,d:15, lm:'六月'}, {y:2026,m:8,d:13, lm:'七月'},
+  {y:2026,m:9,d:12, lm:'八月'}, {y:2026,m:10,d:11, lm:'九月'},
+  {y:2026,m:11,d:10, lm:'十月'},{y:2026,m:12,d:9, lm:'十一月'},
+  {y:2027,m:1,d:8, lm:'十二月'},{y:2027,m:2,d:6, lm:'正月'},
+];
+
+function getLunarDay(gYear, gMonth, gDay) {
+  // gMonth is 1-indexed
+  const gDate = new Date(gYear, gMonth-1, gDay);
+  // Find last new moon before or on this date
+  let best = null;
+  for (const nm of LUNAR_NEW_MOONS) {
+    const nmDate = new Date(nm.y, nm.m-1, nm.d);
+    if (nmDate <= gDate) best = { date: nmDate, lm: nm.lm };
+  }
+  if (!best) return '';
+  const diff = Math.round((gDate - best.date) / 86400000);
+  if (diff === 0) return best.lm + '初一';
+  return LUNAR_DAYS[diff] || '';
+}
+
+// ─── Taiwan Holidays & Festivals ───
+function getSpecialDays(year, month) {
+  // month is 0-indexed
+  const m = month + 1;
+  const holidays = {};
+  const festivals = {};
+  const jieqi = {};
+
+  // National Holidays (fixed)
+  if (m===1) { holidays['1']='元旦'; }
+  if (m===2 && year===2026) { holidays['28']='和平紀念日'; }
+  if (m===4) { holidays['4']='兒童節'; holidays['5']='清明節'; }
+  if (m===5) { holidays['1']='勞動節'; }
+  if (m===6 && year===2026) { holidays['19']='端午節'; }
+  if (m===9) { holidays['28']='教師節'; }
+  if (m===10) { holidays['10']='國慶日'; }
+
+  // Floating holidays (Mother's Day = 2nd Sunday of May)
+  if (m===5) {
+    const secondSun = getNthWeekday(year, month, 0, 2);
+    festivals[String(secondSun)] = '母親節';
+  }
+  // Father's Day = Aug 8
+  if (m===8) { festivals['8'] = '父親節'; }
+  // Mazu birthday = 3rd lunar month 23rd = find gregorian
+  if (m===5 && year===2026) { festivals['9'] = '媽祖生'; }
+
+  // 24 Solar Terms (approximate, key ones)
+  const terms = {
+    '2026-1': {5:'小寒',20:'大寒'},
+    '2026-2': {3:'立春',18:'雨水'},
+    '2026-3': {5:'驚蟄',20:'春分'},
+    '2026-4': {4:'清明',20:'穀雨'},
+    '2026-5': {5:'立夏',21:'小滿'},
+    '2026-6': {6:'芒種',21:'夏至'},
+    '2026-7': {7:'小暑',23:'大暑'},
+    '2026-8': {7:'立秋',23:'處暑'},
+    '2026-9': {7:'白露',23:'秋分'},
+    '2026-10':{8:'寒露',23:'霜降'},
+    '2026-11':{7:'立冬',22:'小雪'},
+    '2026-12':{7:'大雪',22:'冬至'},
+    '2025-1': {5:'小寒',20:'大寒'},
+    '2025-5': {5:'立夏',21:'小滿'},
+    '2025-12':{7:'大雪',22:'冬至'},
+  };
+  const key = `${year}-${m}`;
+  if (terms[key]) {
+    for (const [d, name] of Object.entries(terms[key])) {
+      jieqi[d] = name;
+    }
+  }
+
+  return { holidays, festivals, jieqi };
+}
+
+function getNthWeekday(year, month, weekday, n) {
+  // month is 0-indexed, weekday: 0=Sun
+  let count = 0;
+  for (let d = 1; d <= 31; d++) {
+    const date = new Date(year, month, d);
+    if (date.getMonth() !== month) break;
+    if (date.getDay() === weekday) {
+      count++;
+      if (count === n) return d;
+    }
+  }
+}
+
+// ─── Month names ───
+const EN_MONTHS = ['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE',
+  'JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const ZH_MONTHS = ['一月','二月','三月','四月','五月','六月',
+  '七月','八月','九月','十月','十一月','十二月'];
+
+// ─── Render Calendar ───
+function renderCal() {
+  const y = state.year, m = state.month;
+  const c = document.getElementById('cText').value;
+  const cH = document.getElementById('cHoli').value;
+  const cJ = document.getElementById('cJieqi').value;
+  const cSp = document.getElementById('cSpecial').value;
+  const cSun = document.getElementById('cSun').value;
+  const cSat = document.getElementById('cSat').value;
+  const cGold = document.getElementById('cGold').value;
+  const cZh = document.getElementById('cZh').value;
+  const titleSize = document.getElementById('titleSize').value;
+  const dateSize = document.getElementById('dateSize').value;
+  const lunarSize = document.getElementById('lunarSize').value;
+  const rowH = document.getElementById('rowH').value;
+  const calTop = document.getElementById('calTop').value;
+  const calPad = document.getElementById('calPad').value;
+  const font = state.font === 'Garamond' ? 'Cormorant Garamond' :
+               state.font === 'Georgia'  ? 'Georgia' :
+               state.font === 'Noto'     ? 'Noto Serif TC' : 'Cormorant';
+
+  const firstDay = new Date(y, m, 1).getDay();
+  const daysInMonth = new Date(y, m+1, 0).getDate();
+  const { holidays, festivals, jieqi } = getSpecialDays(y, m);
+
+  // Get lunar month labels for sub line
+  const lunarStart = getLunarDay(y, m+1, 1);
+  const lunarEnd = getLunarDay(y, m+1, daysInMonth);
+
+  const calLayer = document.getElementById('calLayer');
+  calLayer.style.top = calTop + 'px';
+  calLayer.style.padding = `0 ${calPad}px`;
+
+  // Build cells
+  let cells = '';
+  // Empty leading cells
+  for (let i = 0; i < firstDay; i++) {
+    cells += `<div class="cal-cell empty"></div>`;
+  }
+
+  for (let d = 1; d <= daysInMonth; d++) {
+    const date = new Date(y, m, d);
+    const dow = date.getDay(); // 0=Sun, 6=Sat
+    const ds = String(d);
+    const isSun = dow === 0;
+    const isSat = dow === 6;
+    const holi = state.showHoliday ? holidays[ds] : null;
+    const fest = state.showFestival ? festivals[ds] : null;
+    const jq   = state.showJieqi   ? jieqi[ds]    : null;
+    const lunar = state.showLunar   ? getLunarDay(y, m+1, d) : null;
+
+    // Determine cell color
+    let gColor = isSun ? cSun : isSat ? cSat : c;
+    let lColor = isSun ? cSun+'99' : isSat ? cSat+'99' : c+'88';
+    let extraLabel = '';
+    let cellClass = 'cal-cell';
+    let dotHtml = '';
+
+    if (holi) {
+      gColor = cH;
+      lColor = cH + '99';
+      extraLabel = `<span class="cal-l" style="color:${cH}aa">${holi}</span>`;
+      dotHtml = `<span style="position:absolute;bottom:1px;width:3px;height:3px;border-radius:50%;background:${cH};opacity:0.65"></span>`;
+    } else if (fest) {
+      gColor = cSp;
+      lColor = cSp + '88';
+      extraLabel = `<span class="cal-l" style="color:${cSp}aa">${fest}</span>`;
+    }
+
+    const lunarHtml = (lunar && state.showLunar)
+      ? `<span class="cal-l" style="font-size:${lunarSize}px;color:${
+          jq ? cJ+'cc' : lColor}">${jq || lunar}</span>`
+      : (jq ? `<span class="cal-l" style="font-size:${lunarSize}px;color:${cJ}">${jq}</span>` : '');
+
+    const pawHtml = (isSat && state.showPaw)
+      ? `<span class="cal-paw">🐾</span>` : '';
+
+    const ringStyle = fest ? `style="outline:0.5px solid ${cSp}66;outline-offset:3px;border-radius:50%"` : '';
+
+    cells += `
+      <div class="${cellClass}" style="min-height:${rowH}px">
+        ${pawHtml}
+        ${extraLabel}
+        <span class="cal-g" style="font-size:${dateSize}px;color:${gColor};font-family:'${font}',serif" ${ringStyle}>${d}</span>
+        ${lunarHtml}
+        ${dotHtml}
+      </div>`;
+  }
+
+  // Sub line lunar months
+  const subParts = [];
+  // detect which lunar months span this gregorian month
+  const lunarFirst = getLunarDay(y, m+1, 1);
+  const lunarLast  = getLunarDay(y, m+1, daysInMonth);
+  // Find new moons within this month
+  const newMoonsInMonth = LUNAR_NEW_MOONS.filter(nm => nm.y === y && nm.m === m+1);
+  if (newMoonsInMonth.length > 0) {
+    // spans two lunar months
+    const prev = LUNAR_NEW_MOONS.filter(nm => new Date(nm.y,nm.m-1,nm.d) < new Date(y,m,1)).pop();
+    if (prev) subParts.push(prev.lm);
+    newMoonsInMonth.forEach(nm => subParts.push(nm.lm));
+  } else {
+    const prev = LUNAR_NEW_MOONS.filter(nm => new Date(nm.y,nm.m-1,nm.d) <= new Date(y,m,1)).pop();
+    if (prev) subParts.push(prev.lm);
+  }
+  // Add jieqi names
+  const jqNames = Object.values(jieqi);
+  const subLine = [...new Set([...subParts, ...jqNames])].join(' · ');
+
+  // Legend
+  const legendHtml = state.showLegend ? `
+    <div class="cal-legend" style="border-top:0.5px solid ${c}22">
+      <div class="cal-leg-item" style="color:${c}66">
+        <div class="cal-leg-dot" style="background:${cH}"></div>國定假日
+      </div>
+      <div class="cal-leg-item" style="color:${c}66">
+        <div class="cal-leg-dot" style="background:${cJ}"></div>節氣
+      </div>
+      <div class="cal-leg-item" style="color:${c}66">
+        <div class="cal-leg-dot" style="background:${cSp}"></div>特別日
+      </div>
+    </div>` : '';
+
+  calLayer.innerHTML = `
+    <div class="cal-header">
+      <div class="cal-title-row">
+        <span id="calMonthEn" style="font-size:${titleSize}px;color:${c};font-family:'${font}',serif">${EN_MONTHS[m]}</span>
+        <div class="cal-right">
+          <span id="calYear" style="color:${c}99;font-family:'Cormorant Garamond',serif;font-size:12px;font-style:italic;letter-spacing:3px;display:block;line-height:1.5">${y}</span>
+          <span id="calMonthZh" style="color:${cZh};font-family:'Noto Serif TC',serif;font-size:16px;font-weight:200;letter-spacing:6px;display:block">${ZH_MONTHS[m]}</span>
+        </div>
+      </div>
+      <div class="cal-rule" style="margin:5px 0 3px">
+        <div class="cal-rule-line" style="background:linear-gradient(90deg,transparent,${cGold}55,transparent)"></div>
+        <div class="cal-rule-mark" style="border-color:${cGold}"></div>
+        <div class="cal-rule-line" style="background:linear-gradient(90deg,transparent,${cGold}55,transparent)"></div>
+      </div>
+      <div id="calSub" style="font-family:'Noto Serif TC',serif;font-size:7px;font-weight:200;letter-spacing:2.5px;text-align:center;color:${c}55">${subLine}</div>
+    </div>
+    <div class="cal-wk-row" style="border-bottom:0.5px solid ${c}22;margin:7px 0 3px;padding-bottom:3px">
+      <div class="cal-wk" style="color:${cSun}99;font-family:'Cormorant Garamond',serif">Sun</div>
+      <div class="cal-wk" style="color:${c}66;font-family:'Cormorant Garamond',serif">Mon</div>
+      <div class="cal-wk" style="color:${c}66;font-family:'Cormorant Garamond',serif">Tue</div>
+      <div class="cal-wk" style="color:${c}66;font-family:'Cormorant Garamond',serif">Wed</div>
+      <div class="cal-wk" style="color:${c}66;font-family:'Cormorant Garamond',serif">Thu</div>
+      <div class="cal-wk" style="color:${c}66;font-family:'Cormorant Garamond',serif">Fri</div>
+      <div class="cal-wk" style="color:${cSat}99;font-family:'Cormorant Garamond',serif">Sat</div>
+    </div>
+    <div class="cal-grid">${cells}</div>
+    ${legendHtml}
+  `;
+}
+
+// ─── Toggle switches ───
+function toggle(key) {
+  state[key] = !state[key];
+  const sw = document.getElementById('sw-' + key);
+  sw.classList.toggle('on', state[key]);
+  renderCal();
+}
+
+// ─── Font selection ───
+function setFont(font) {
+  state.font = font;
+  document.querySelectorAll('.font-btn').forEach(b => b.classList.remove('active'));
+  document.querySelector(`[data-font="${font}"]`).classList.add('active');
+  renderCal();
+}
+
+// ─── Slider display update ───
+function updateSlider(id, valId) {
+  document.getElementById(valId).textContent = document.getElementById(id).value;
+}
+
+// ─── Background upload ───
+document.getElementById('bgInput').addEventListener('change', function(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(ev) {
+    document.getElementById('bgLayer').style.backgroundImage = `url(${ev.target.result})`;
+    document.getElementById('uploadZone').querySelector('.upload-text').textContent = '✓ ' + file.name;
+  };
+  reader.readAsDataURL(file);
+});
+
+// Drag & drop
+const uz = document.getElementById('uploadZone');
+uz.addEventListener('dragover', e => { e.preventDefault(); uz.style.borderColor = 'var(--gold)'; });
+uz.addEventListener('dragleave', () => { uz.style.borderColor = ''; });
+uz.addEventListener('drop', e => {
+  e.preventDefault(); uz.style.borderColor = '';
+  const file = e.dataTransfer.files[0];
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('bgLayer').style.backgroundImage = `url(${ev.target.result})`;
+    uz.querySelector('.upload-text').textContent = '✓ ' + file.name;
+  };
+  reader.readAsDataURL(file);
+});
+
+// ─── Year selector ───
+const selYear = document.getElementById('selYear');
+for (let y = 2024; y <= 2030; y++) {
+  const opt = document.createElement('option');
+  opt.value = y; opt.textContent = y + '年';
+  if (y === 2026) opt.selected = true;
+  selYear.appendChild(opt);
+}
+selYear.addEventListener('change', () => { state.year = +selYear.value; renderCal(); });
+document.getElementById('selMonth').addEventListener('change', function() {
+  state.month = +this.value; renderCal();
+});
+
+// ─── Export ───
+function exportImg() {
+  // Use html2canvas if available, otherwise guide user
+  if (typeof html2canvas !== 'undefined') {
+    html2canvas(document.getElementById('phoneFrame'), { scale: 3 }).then(canvas => {
+      const a = document.createElement('a');
+      a.download = `wallpaper-${state.year}-${String(state.month+1).padStart(2,'0')}.png`;
+      a.href = canvas.toDataURL('image/png');
+      a.click();
+    });
+  } else {
+    document.getElementById('previewNote').textContent = '💡 對手機框截圖後設定為桌布';
+    // Flash the phone frame
+    const f = document.getElementById('phoneFrame');
+    f.style.outline = '2px solid #c8a84a';
+    setTimeout(() => f.style.outline = '', 1500);
+  }
+}
+
+// ─── Init ───
+renderCal();
+</script>
+
+<!-- html2canvas for export -->
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+</body>
+</html>
