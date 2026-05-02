@@ -1,0 +1,355 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>壁紙月曆產生器</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant:ital,wght@0,300;0,400;0,500;1,300&family=Cormorant+Garamond:ital,wght@0,300;0,400;1,300&family=Noto+Serif+TC:wght@200;300;400&display=swap" rel="stylesheet">
+<style>
+* { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+:root {
+  --bg:#18150f; --card:#211d15; --border:rgba(200,175,100,0.13);
+  --gold:#c8a84a; --text:#ece4d0; --dim:rgba(236,228,208,0.48);
+  --faint:rgba(236,228,208,0.22); --accent:#9a7230; --r:10px;
+}
+html { background:var(--bg); }
+body { background:var(--bg); color:var(--text); font-family:'Noto Serif TC',serif; min-height:100dvh; padding-bottom:48px; }
+
+.top-bar { background:var(--card); border-bottom:1px solid var(--border); padding:16px 20px 14px; display:flex; align-items:baseline; gap:12px; position:sticky; top:0; z-index:100; }
+.top-title { font-family:'Cormorant Garamond',serif; font-size:17px; font-style:italic; letter-spacing:3px; color:var(--gold); }
+.top-sub { font-size:9px; color:var(--dim); letter-spacing:2px; }
+
+.section { margin:14px 14px 0; background:var(--card); border:1px solid var(--border); border-radius:var(--r); overflow:hidden; }
+.sec-hdr { padding:10px 14px 9px; font-size:8.5px; letter-spacing:3px; color:var(--gold); text-transform:uppercase; border-bottom:1px solid var(--border); }
+.sec-body { padding:14px; }
+
+.preview-section { margin:14px 14px 0; display:flex; flex-direction:column; align-items:center; gap:10px; }
+.preview-hint { font-size:8px; color:var(--dim); letter-spacing:2px; text-align:center; }
+
+#phoneFrame { width:270px; height:585px; border-radius:34px; overflow:hidden; position:relative; border:1.5px solid rgba(200,175,120,0.18); filter:drop-shadow(0 16px 40px rgba(0,0,0,0.65)); }
+#bgLayer { position:absolute; inset:0; background-size:cover; background-position:center top; background-color:#e8e2d6; }
+#calLayer { position:absolute; left:0; right:0; padding:0 14px; z-index:5; }
+
+.cal-title-row { display:flex; align-items:flex-end; justify-content:space-between; }
+.cal-right { text-align:right; padding-bottom:3px; }
+.cal-rule { display:flex; align-items:center; gap:5px; }
+.cal-rule-line { flex:1; height:0.5px; }
+.cal-rule-mark { width:3.5px; height:3.5px; border:0.5px solid; transform:rotate(45deg); opacity:0.5; }
+.cal-wk-row { display:grid; grid-template-columns:repeat(7,1fr); }
+.cal-wk { text-align:center; font-family:'Cormorant Garamond',serif; font-size:7px; letter-spacing:0.8px; }
+.cal-grid { display:grid; grid-template-columns:repeat(7,1fr); }
+.cal-cell { display:flex; flex-direction:column; align-items:center; justify-content:center; padding:1px 0; position:relative; }
+.cal-cell.empty { opacity:0; }
+.cal-paw { position:absolute; top:1px; right:0; font-size:7px; opacity:0.28; line-height:1; }
+.cal-legend { display:flex; gap:10px; justify-content:center; }
+.cal-leg-item { display:flex; align-items:center; gap:3px; font-family:'Cormorant Garamond',serif; font-size:5.5px; font-style:italic; }
+.cal-leg-dot { width:3px; height:3px; border-radius:50%; }
+
+.upload-zone { border:1.5px dashed rgba(200,168,74,0.28); border-radius:8px; padding:18px 14px; text-align:center; cursor:pointer; position:relative; }
+.upload-zone input { position:absolute; inset:0; opacity:0; cursor:pointer; font-size:16px; }
+.upload-icon { font-size:22px; margin-bottom:6px; }
+.upload-text { font-size:11px; color:var(--dim); letter-spacing:1px; line-height:1.6; }
+.upload-hint { font-size:8.5px; color:var(--faint); margin-top:3px; }
+
+.month-row { display:flex; gap:8px; }
+.month-row select { flex:1; background:rgba(255,255,255,0.04); border:1px solid var(--border); border-radius:7px; color:var(--text); padding:9px 10px; font-family:'Noto Serif TC',serif; font-size:12px; outline:none; -webkit-appearance:none; }
+.month-row select option { background:#221d14; }
+
+.toggle-group { display:flex; flex-direction:column; }
+.toggle-row { display:flex; align-items:center; justify-content:space-between; padding:11px 14px; cursor:pointer; border-bottom:1px solid var(--border); user-select:none; }
+.toggle-row:last-child { border-bottom:none; }
+.t-label { font-size:11.5px; color:var(--dim); }
+.t-label small { display:block; font-size:8.5px; color:var(--faint); margin-top:1px; }
+.switch { width:34px; height:18px; border-radius:12px; background:rgba(255,255,255,0.1); position:relative; transition:background .2s; flex-shrink:0; }
+.switch.on { background:var(--accent); }
+.switch::after { content:''; position:absolute; width:14px; height:14px; border-radius:50%; background:#fff; top:2px; left:2px; transition:transform .2s; }
+.switch.on::after { transform:translateX(16px); }
+
+.slider-group { display:flex; flex-direction:column; gap:14px; }
+.slider-item label { display:flex; justify-content:space-between; font-size:9.5px; color:var(--dim); margin-bottom:6px; }
+.slider-item label span { color:var(--gold); font-family:'Cormorant Garamond',serif; font-size:12px; }
+input[type=range] { width:100%; -webkit-appearance:none; height:2px; background:rgba(255,255,255,0.1); border-radius:2px; outline:none; }
+input[type=range]::-webkit-slider-thumb { -webkit-appearance:none; width:16px; height:16px; border-radius:50%; background:var(--gold); cursor:pointer; }
+
+.color-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:10px; }
+.color-item { display:flex; flex-direction:column; align-items:center; gap:5px; font-size:7.5px; color:var(--faint); text-align:center; }
+.color-item input[type=color] { width:36px; height:36px; border-radius:8px; border:1px solid var(--border); background:none; cursor:pointer; padding:2px; }
+
+.font-grid { display:grid; grid-template-columns:1fr 1fr; gap:7px; }
+.font-btn { padding:9px 8px; border:1px solid var(--border); border-radius:7px; background:transparent; color:var(--dim); font-size:11px; cursor:pointer; text-align:center; letter-spacing:0.5px; }
+.font-btn.active { border-color:var(--gold); color:var(--gold); background:rgba(200,168,74,0.07); }
+
+.export-wrap { margin:16px 14px 0; }
+.export-btn { width:100%; padding:14px; background:linear-gradient(135deg,#8a6428,#c8a84a); color:#18130a; border:none; border-radius:10px; font-family:'Cormorant Garamond',serif; font-size:15px; letter-spacing:3px; cursor:pointer; display:block; }
+.export-btn:active { opacity:0.8; }
+.export-note { margin-top:10px; font-size:9px; color:var(--dim); text-align:center; letter-spacing:1px; line-height:1.9; background:rgba(200,168,74,0.06); border:1px solid var(--border); border-radius:8px; padding:10px; }
+#resultImg { display:none; width:100%; border-radius:10px; border:1px solid var(--border); margin-top:12px; }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div class="top-title">Calendar Wallpaper</div>
+  <div class="top-sub">壁紙月曆產生器</div>
+</div>
+
+<div class="preview-section">
+  <div id="phoneFrame">
+    <div id="bgLayer"></div>
+    <div id="calLayer"></div>
+  </div>
+  <div class="preview-hint">↑ 即時預覽</div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">🖼 背景圖片</div>
+  <div class="sec-body">
+    <div class="upload-zone">
+      <input type="file" id="bgInput" accept="image/*">
+      <div class="upload-icon">＋</div>
+      <div class="upload-text" id="uploadText">點擊上傳插畫背景</div>
+      <div class="upload-hint">JPG · PNG · WEBP</div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">📅 月份設定</div>
+  <div class="sec-body">
+    <div class="month-row">
+      <select id="selYear"></select>
+      <select id="selMonth">
+        <option value="0">1月 Jan</option><option value="1">2月 Feb</option>
+        <option value="2">3月 Mar</option><option value="3">4月 Apr</option>
+        <option value="4" selected>5月 May</option><option value="5">6月 Jun</option>
+        <option value="6">7月 Jul</option><option value="7">8月 Aug</option>
+        <option value="8">9月 Sep</option><option value="9">10月 Oct</option>
+        <option value="10">11月 Nov</option><option value="11">12月 Dec</option>
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">👁 顯示設定</div>
+  <div class="toggle-group">
+    <div class="toggle-row" onclick="tog('showLunar')"><div class="t-label">農曆日期<small>農曆初一、十五等</small></div><div class="switch on" id="sw-showLunar"></div></div>
+    <div class="toggle-row" onclick="tog('showHoliday')"><div class="t-label">國定假日<small>勞動節、元旦等</small></div><div class="switch on" id="sw-showHoliday"></div></div>
+    <div class="toggle-row" onclick="tog('showFestival')"><div class="t-label">傳統節日<small>母親節、媽祖生等</small></div><div class="switch on" id="sw-showFestival"></div></div>
+    <div class="toggle-row" onclick="tog('showJieqi')"><div class="t-label">二十四節氣<small>立夏、小滿等</small></div><div class="switch on" id="sw-showJieqi"></div></div>
+    <div class="toggle-row" onclick="tog('showPaw')"><div class="t-label">週末貓掌印 🐾<small>週六裝飾</small></div><div class="switch on" id="sw-showPaw"></div></div>
+    <div class="toggle-row" onclick="tog('showLegend')"><div class="t-label">圖例說明<small>底部色點標示</small></div><div class="switch on" id="sw-showLegend"></div></div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">🔤 字型</div>
+  <div class="sec-body">
+    <div class="font-grid">
+      <button class="font-btn active" onclick="setFont('Cormorant')" data-font="Cormorant">Cormorant<br><small style="font-size:8px;opacity:.5">典雅襯線</small></button>
+      <button class="font-btn" onclick="setFont('Garamond')" data-font="Garamond">Garamond<br><small style="font-size:8px;opacity:.5">古典書籍</small></button>
+      <button class="font-btn" onclick="setFont('Georgia')" data-font="Georgia">Georgia<br><small style="font-size:8px;opacity:.5">清晰易讀</small></button>
+      <button class="font-btn" onclick="setFont('Noto')" data-font="Noto">Noto Serif<br><small style="font-size:8px;opacity:.5">中文優先</small></button>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">📐 大小 · 間距</div>
+  <div class="sec-body">
+    <div class="slider-group">
+      <div class="slider-item"><label>月份標題 <span id="vTS">52</span>px</label><input type="range" min="32" max="80" value="52" id="titleSize" oninput="sv('titleSize','vTS')"></div>
+      <div class="slider-item"><label>日期數字 <span id="vDS">14</span>px</label><input type="range" min="9" max="22" value="14" id="dateSize" oninput="sv('dateSize','vDS')"></div>
+      <div class="slider-item"><label>農曆字體 <span id="vLS">5</span>px</label><input type="range" min="3" max="9" value="5" step="0.5" id="lunarSize" oninput="sv('lunarSize','vLS')"></div>
+      <div class="slider-item"><label>行高間距 <span id="vRH">30</span>px</label><input type="range" min="22" max="46" value="30" id="rowH" oninput="sv('rowH','vRH')"></div>
+      <div class="slider-item"><label>距頂部 <span id="vCT">28</span>px</label><input type="range" min="8" max="200" value="28" id="calTop" oninput="sv('calTop','vCT')"></div>
+      <div class="slider-item"><label>左右邊距 <span id="vCP">14</span>px</label><input type="range" min="6" max="36" value="14" id="calPad" oninput="sv('calPad','vCP')"></div>
+    </div>
+  </div>
+</div>
+
+<div class="section">
+  <div class="sec-hdr">🎨 顏色</div>
+  <div class="sec-body">
+    <div class="color-grid">
+      <div class="color-item"><input type="color" id="cText" value="#1e1a17" oninput="renderCal()"><span>文字</span></div>
+      <div class="color-item"><input type="color" id="cHoli" value="#a82820" oninput="renderCal()"><span>假日</span></div>
+      <div class="color-item"><input type="color" id="cJieqi" value="#907028" oninput="renderCal()"><span>節氣</span></div>
+      <div class="color-item"><input type="color" id="cSpecial" value="#685878" oninput="renderCal()"><span>特別日</span></div>
+      <div class="color-item"><input type="color" id="cSun" value="#b03020" oninput="renderCal()"><span>週日</span></div>
+      <div class="color-item"><input type="color" id="cSat" value="#507050" oninput="renderCal()"><span>週六</span></div>
+      <div class="color-item"><input type="color" id="cGold" value="#907028" oninput="renderCal()"><span>裝飾線</span></div>
+      <div class="color-item"><input type="color" id="cZh" value="#685878" oninput="renderCal()"><span>中文月</span></div>
+    </div>
+  </div>
+</div>
+
+<div class="export-wrap">
+  <button class="export-btn" id="exportBtn" onclick="doExport()">↓ &nbsp;產生桌布圖片</button>
+  <div class="export-note" id="exportNote">點擊按鈕產生圖片<br>圖片出現後 → 長按 → 儲存到相簿</div>
+  <img id="resultImg" alt="產生的桌布">
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+const S={ year:2026, month:4, showLunar:true, showHoliday:true, showFestival:true, showJieqi:true, showPaw:true, showLegend:true, font:'Cormorant' };
+
+const NM=[
+  {y:2025,m:1,d:29,lm:'正月'},{y:2025,m:3,d:29,lm:'二月'},{y:2025,m:4,d:27,lm:'三月'},
+  {y:2025,m:5,d:27,lm:'四月'},{y:2025,m:6,d:25,lm:'五月'},{y:2025,m:7,d:25,lm:'六月'},
+  {y:2025,m:8,d:23,lm:'七月'},{y:2025,m:9,d:22,lm:'八月'},{y:2025,m:10,d:21,lm:'九月'},
+  {y:2025,m:11,d:20,lm:'十月'},{y:2025,m:12,d:20,lm:'十一月'},
+  {y:2026,m:1,d:18,lm:'十二月'},{y:2026,m:2,d:17,lm:'正月'},{y:2026,m:3,d:19,lm:'二月'},
+  {y:2026,m:4,d:17,lm:'三月'},{y:2026,m:5,d:17,lm:'四月'},{y:2026,m:6,d:15,lm:'五月'},
+  {y:2026,m:7,d:15,lm:'六月'},{y:2026,m:8,d:13,lm:'七月'},{y:2026,m:9,d:12,lm:'八月'},
+  {y:2026,m:10,d:11,lm:'九月'},{y:2026,m:11,d:10,lm:'十月'},{y:2026,m:12,d:9,lm:'十一月'},
+  {y:2027,m:1,d:8,lm:'十二月'},{y:2027,m:2,d:6,lm:'正月'},{y:2027,m:3,d:8,lm:'二月'},
+  {y:2027,m:4,d:6,lm:'三月'},{y:2027,m:5,d:6,lm:'四月'},{y:2027,m:6,d:4,lm:'五月'},
+];
+const LD=['初一','初二','初三','初四','初五','初六','初七','初八','初九','初十','十一','十二','十三','十四','十五','十六','十七','十八','十九','二十','廿一','廿二','廿三','廿四','廿五','廿六','廿七','廿八','廿九','三十'];
+
+function getLunar(y,m,d){
+  const gd=new Date(y,m-1,d); let best=null;
+  for(const n of NM){ const nd=new Date(n.y,n.m-1,n.d); if(nd<=gd) best={date:nd,lm:n.lm}; }
+  if(!best) return '';
+  const diff=Math.round((gd-best.date)/86400000);
+  return diff===0? best.lm+'初一' : LD[diff]||'';
+}
+
+const TERMS={
+  '2025-1':{5:'小寒',20:'大寒'},'2025-2':{3:'立春',18:'雨水'},'2025-3':{5:'驚蟄',20:'春分'},
+  '2025-4':{4:'清明',20:'穀雨'},'2025-5':{5:'立夏',21:'小滿'},'2025-6':{6:'芒種',21:'夏至'},
+  '2025-7':{7:'小暑',23:'大暑'},'2025-8':{7:'立秋',23:'處暑'},'2025-9':{7:'白露',23:'秋分'},
+  '2025-10':{8:'寒露',23:'霜降'},'2025-11':{7:'立冬',22:'小雪'},'2025-12':{7:'大雪',22:'冬至'},
+  '2026-1':{5:'小寒',20:'大寒'},'2026-2':{3:'立春',18:'雨水'},'2026-3':{5:'驚蟄',20:'春分'},
+  '2026-4':{4:'清明',20:'穀雨'},'2026-5':{5:'立夏',21:'小滿'},'2026-6':{6:'芒種',21:'夏至'},
+  '2026-7':{7:'小暑',23:'大暑'},'2026-8':{7:'立秋',23:'處暑'},'2026-9':{7:'白露',23:'秋分'},
+  '2026-10':{8:'寒露',23:'霜降'},'2026-11':{7:'立冬',22:'小雪'},'2026-12':{7:'大雪',22:'冬至'},
+  '2027-1':{5:'小寒',20:'大寒'},'2027-2':{3:'立春',18:'雨水'},'2027-3':{5:'驚蟄',20:'春分'},
+  '2027-4':{5:'清明',20:'穀雨'},'2027-5':{5:'立夏',21:'小滿'},'2027-6':{6:'芒種',21:'夏至'},
+};
+
+function getSpecial(y,m){
+  const mn=m+1, H={}, F={};
+  if(mn===1){H[1]='元旦';}
+  if(mn===4){H[4]='兒童節';}
+  if(mn===5){H[1]='勞動節';}
+  if(mn===10){H[10]='國慶日';}
+  if(mn===2&&y===2026){H[28]='和平紀念日';}
+  if(mn===1&&y===2026){H[28]='除夕';}
+  if(mn===2&&y===2026){H[17]='春節初一';}
+  if(mn===6&&y===2026){H[19]='端午節';}
+  if(mn===9&&y===2026){H[25]='中秋節';}
+  if(mn===5){ const d2=getNth(y,m,0,2); if(d2) F[d2]='母親節'; }
+  if(mn===8){ F[8]='父親節'; }
+  if(mn===5&&y===2026){ F[9]='媽祖生'; }
+  if(mn===4&&y===2025){ F[4]='媽祖生'; }
+  const J=TERMS[`${y}-${mn}`]||{};
+  return {H,F,J};
+}
+
+function getNth(y,m,dow,n){
+  let c=0;
+  for(let d=1;d<=31;d++){ const dt=new Date(y,m,d); if(dt.getMonth()!==m) break; if(dt.getDay()===dow){c++; if(c===n) return d;} }
+}
+
+const EN=['JANUARY','FEBRUARY','MARCH','APRIL','MAY','JUNE','JULY','AUGUST','SEPTEMBER','OCTOBER','NOVEMBER','DECEMBER'];
+const ZH=['一月','二月','三月','四月','五月','六月','七月','八月','九月','十月','十一月','十二月'];
+
+function g(id){return document.getElementById(id);}
+function v(id){return g(id).value;}
+function sv(id,vid){g(vid).textContent=v(id); renderCal();}
+function tog(k){S[k]=!S[k]; g('sw-'+k).classList.toggle('on',S[k]); renderCal();}
+function setFont(f){S.font=f; document.querySelectorAll('.font-btn').forEach(b=>b.classList.remove('active')); document.querySelector(`[data-font="${f}"]`).classList.add('active'); renderCal();}
+
+function renderCal(){
+  const y=S.year, m=S.month;
+  const c=v('cText'),cH=v('cHoli'),cJ=v('cJieqi'),cSp=v('cSpecial');
+  const cSun=v('cSun'),cSat=v('cSat'),cGold=v('cGold'),cZh=v('cZh');
+  const ts=v('titleSize'),ds=v('dateSize'),ls=v('lunarSize'),rh=v('rowH'),ct=v('calTop'),cp=v('calPad');
+  const ff=S.font==='Garamond'?'Cormorant Garamond':S.font==='Georgia'?'Georgia':S.font==='Noto'?'Noto Serif TC':'Cormorant';
+
+  const first=new Date(y,m,1).getDay(), days=new Date(y,m+1,0).getDate();
+  const {H,F,J}=getSpecial(y,m);
+
+  const cl=g('calLayer');
+  cl.style.top=ct+'px'; cl.style.padding=`0 ${cp}px`;
+
+  const nm2=NM.filter(n=>n.y===y&&n.m===m+1);
+  const prev=[...NM].reverse().find(n=>new Date(n.y,n.m-1,n.d)<=new Date(y,m,1));
+  const lmP=[...new Set([prev?prev.lm:'',...nm2.map(n=>n.lm)].filter(Boolean))];
+  const subLine=[...lmP,...Object.values(J)].join(' · ');
+
+  let cells='';
+  for(let i=0;i<first;i++) cells+=`<div class="cal-cell empty"></div>`;
+  for(let d=1;d<=days;d++){
+    const dow=new Date(y,m,d).getDay(), isSun=dow===0, isSat=dow===6;
+    const holi=S.showHoliday?H[d]:null, fest=S.showFestival?F[d]:null;
+    const jq=S.showJieqi?J[String(d)]:null, lunar=S.showLunar?getLunar(y,m+1,d):null;
+    let gc=isSun?cSun:isSat?cSat:c, lc=isSun?cSun+'99':isSat?cSat+'88':c+'77';
+    let extraL='', dotH='', ringS='';
+    if(holi){ gc=cH; lc=cH+'99'; extraL=`<span style="font-family:'Noto Serif TC',serif;font-size:${ls}px;color:${cH}bb;line-height:1.2;text-align:center;display:block">${holi}</span>`; dotH=`<span style="position:absolute;bottom:1px;width:2.5px;height:2.5px;border-radius:50%;background:${cH};opacity:.65"></span>`; }
+    else if(fest){ gc=cSp; lc=cSp+'88'; extraL=`<span style="font-family:'Noto Serif TC',serif;font-size:${ls}px;color:${cSp}bb;line-height:1.2;text-align:center;display:block">${fest}</span>`; ringS=`outline:.5px solid ${cSp}55;outline-offset:3px;border-radius:50%;`; }
+    const lunarH=(lunar||jq)?`<span style="font-family:'Noto Serif TC',serif;font-size:${ls}px;color:${jq?cJ+'cc':lc};margin-top:1px;line-height:1.2;display:block;text-align:center">${jq||lunar}</span>`:'';
+    const pawH=(isSat&&S.showPaw)?`<span class="cal-paw">🐾</span>`:'';
+    cells+=`<div class="cal-cell" style="min-height:${rh}px">${pawH}${extraL}<span style="font-family:'${ff}',serif;font-size:${ds}px;font-weight:300;line-height:1;color:${gc};${ringS}">${d}</span>${lunarH}${dotH}</div>`;
+  }
+
+  const legH=S.showLegend?`<div class="cal-legend" style="border-top:.5px solid ${c}1a;padding-top:3px;margin-top:3px"><div class="cal-leg-item" style="color:${c}55"><div class="cal-leg-dot" style="background:${cH}"></div>假日</div><div class="cal-leg-item" style="color:${c}55"><div class="cal-leg-dot" style="background:${cJ}"></div>節氣</div><div class="cal-leg-item" style="color:${c}55"><div class="cal-leg-dot" style="background:${cSp}"></div>特別</div></div>`:'';
+
+  cl.innerHTML=`
+    <div style="margin-bottom:4px">
+      <div class="cal-title-row">
+        <span style="font-family:'${ff}',serif;font-size:${ts}px;font-weight:300;letter-spacing:-.5px;color:${c};line-height:.9">${EN[m]}</span>
+        <div class="cal-right">
+          <span style="font-family:'Cormorant Garamond',serif;font-size:11px;font-weight:300;font-style:italic;letter-spacing:3px;color:${c}88;display:block;line-height:1.5">${y}</span>
+          <span style="font-family:'Noto Serif TC',serif;font-size:14px;font-weight:200;letter-spacing:5px;color:${cZh};display:block">${ZH[m]}</span>
+        </div>
+      </div>
+      <div class="cal-rule" style="margin:4px 0 3px">
+        <div class="cal-rule-line" style="background:linear-gradient(90deg,transparent,${cGold}44,transparent)"></div>
+        <div class="cal-rule-mark" style="border-color:${cGold}"></div>
+        <div class="cal-rule-line" style="background:linear-gradient(90deg,transparent,${cGold}44,transparent)"></div>
+      </div>
+      <div style="font-family:'Noto Serif TC',serif;font-size:6.5px;font-weight:200;letter-spacing:2px;text-align:center;color:${c}44">${subLine}</div>
+    </div>
+    <div class="cal-wk-row" style="border-bottom:.5px solid ${c}1a;margin-bottom:2px;padding-bottom:2px">
+      ${['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].map((w,i)=>`<div class="cal-wk" style="color:${i===0?cSun+'99':i===6?cSat+'88':c+'55'}">${w}</div>`).join('')}
+    </div>
+    <div class="cal-grid">${cells}</div>
+    ${legH}`;
+}
+
+g('bgInput').addEventListener('change',function(e){
+  const file=e.target.files[0]; if(!file) return;
+  const r=new FileReader();
+  r.onload=ev=>{ g('bgLayer').style.backgroundImage=`url(${ev.target.result})`; g('uploadText').textContent='✓ '+file.name; };
+  r.readAsDataURL(file);
+});
+
+const sy=g('selYear');
+for(let y=2024;y<=2030;y++){ const o=document.createElement('option'); o.value=y; o.textContent=y+'年'; if(y===2026) o.selected=true; sy.appendChild(o); }
+sy.addEventListener('change',()=>{S.year=+sy.value; renderCal();});
+g('selMonth').addEventListener('change',function(){S.month=+this.value; renderCal();});
+
+function doExport(){
+  const btn=g('exportBtn'), note=g('exportNote'), img=g('resultImg');
+  btn.textContent='產生中… ⏳'; btn.style.opacity='.6';
+  setTimeout(()=>{
+    html2canvas(g('phoneFrame'),{scale:3,useCORS:true,allowTaint:true,backgroundColor:null,logging:false})
+    .then(canvas=>{
+      const url=canvas.toDataURL('image/png');
+      img.src=url; img.style.display='block';
+      try{ const a=document.createElement('a'); a.download=`wallpaper-${S.year}-${String(S.month+1).padStart(2,'0')}.png`; a.href=url; a.click(); }catch(e){}
+      btn.textContent='↓ 產生桌布圖片'; btn.style.opacity='1';
+      note.innerHTML='✅ 圖片已產生！<br>長按下方圖片 → 儲存到相簿<br><span style="opacity:.6;font-size:8px">電腦版會自動下載</span>';
+      img.scrollIntoView({behavior:'smooth',block:'center'});
+    })
+    .catch(err=>{ btn.textContent='↓ 產生桌布圖片'; btn.style.opacity='1'; note.textContent='⚠ 產生失敗，請截圖預覽後使用'; });
+  }, 50);
+}
+
+renderCal();
+</script>
+</body>
+</html>
